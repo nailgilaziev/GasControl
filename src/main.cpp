@@ -269,17 +269,24 @@ public:
   //   }
   //   return false;
   // }
-  const char *cmds[8] = {"AT+XISP=0",
-                         "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"",
-                         "AT+XIIC=1",
-                         "AT+XIIC?",
-                         "AT+TCPSETUP=0,184.106.153.149,80",
-                         "AT+TCPSEND=0,",
+
+// RING и +CMT: + следующую строку надо ловить и передавать в events listener
+  //ATH release all calls
+  const char *cmds[8] = {"AT+CPAS",//0
+                         "AT+CREG?",  //1
+                         "AT+CSQ",    //2
+                         "AT+XISP=0", //3
+                         "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"", //4
+                         "AT+XGAUTH=1,1,\"\",\"\"",     //5
+                         "AT+XIIC=1", //6
+                         "AT+XIIC?",  //7
+                         "AT+TCPSETUP=0,184.106.153.149,80",  //8
+                         "AT+TCPSEND=0,", //9
                          "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
                          "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
                          "field6=%i HTTP/1.1\r\n"
-                         "Host: 184.106.153.149\r\n\r\n",
-                         "AT+TCPCLOSE=0"
+                         "Host: 184.106.153.149\r\n\r\n",  //10
+                         "AT+TCPCLOSE=0"//11
                        };
 
 
