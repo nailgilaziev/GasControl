@@ -15,7 +15,7 @@
 #include "ProjectData.h"
 #include "SerialRouter.hpp"
 #include <AccelStepper.h>
-#include "NokiaDisplay.h"
+//#include "NokiaDisplay.h"
 #include <Bounce2.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
@@ -24,7 +24,7 @@
 
 #define WARNING_NOT_STARTED_YET 2
 
-SoftwareSerial gsmSerial(34, 36); // RX, TX
+SoftwareSerial gsmSerial(7, 9); // RX, TX
 
 SerialRouter router(&gsmSerial);
 
@@ -72,9 +72,9 @@ DallasTemperature sensors(&oneWire);
 AccelStepper stepper(4, 4, 6, 3, 5);
 int8_t rawData[8];
 
-NokiaDisplay display = NokiaDisplay(rawData);
+//NokiaDisplay display = NokiaDisplay(rawData);
 
-void updateDispay() { display.update(); }
+void updateDispay() { /*display.update();*/ }
 /* UI mode levels:
  * 0 is displaying temperature and ready to rotate stepdriver
  * (pressing rotary button or sensor button switch on display light)
@@ -121,7 +121,7 @@ void setup(void) {
   Serial.println("Started");
 
   gsmSerial.begin(9600);
-  display.init();
+  //display.init();
 
   pinMode(pButton, INPUT); // INPUT_PULLUP - not pulled with builtin resistor
   //                          // bacause pulled with external resistor
