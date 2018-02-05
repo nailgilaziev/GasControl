@@ -15,6 +15,8 @@
 //TODO заменить на ЛЯМБДЫ!!!!!!!
 CmdsQueue *configereSms(SerialRouter *sr) { return new ConfigureCQ(sr); }
 
+CmdsQueue *ringInterrupter(SerialRouter *sr) { return new RingResetterCQ(sr); }
+
 // CmdsQueue *reactOnSms() { return NULL; }
 
 // ring мы будем игнорировать
@@ -22,19 +24,20 @@ CmdsQueue *configereSms(SerialRouter *sr) { return new ConfigureCQ(sr); }
 //далее мы будем слушать
 //смс a25 - установка авто режима и температуры 25 в комнате
 //смс m60 - установка ручного режима на котле в 60 градусов
-const int eventsCount = 1;
+const int eventsCount = 2;
 EventAction events[eventsCount] = {
     // {"MODEM:STARTUP", &echoOff, NULL},
-    {"+PBREADY", &configereSms, NULL}
+    {"+PBREADY", &configereSms, NULL},
+    {"RING", &ringInterrupter, NULL}
     //{"+CMT: \"+79047612279\"", &reactOnSms, NULL},
 };
 
 
-CmdQisFinished EventsListener::newLineEvent(bool isFullLine) {
+
+
+void EventsListener::newLineEvent(bool isFullLine) {
   for (byte i = 0; i < eventsCount; i++) {
-    if (strncmp(events[i].event, sr->lineBuffer, strlen(events[i].event)) ==
-        0) {
-      sr->resetExecutingQ();
+    if (strncmp(events[i].event, sr->lineBuffer, strlen(events[i].event)) == 0) {
       Serial.println(F("SCQ"));
       if (events[i].actionQ) {
         sr->executeQ(events[i].actionQ(sr));
@@ -42,7 +45,7 @@ CmdQisFinished EventsListener::newLineEvent(bool isFullLine) {
       if (events[i].actionFunc) {
         events[i].actionFunc();
       }
-      break;
+      return true;
     }
   }
   return false;

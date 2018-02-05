@@ -28,6 +28,7 @@ typedef int8_t RouterStatus;
 // we a in a stete of partially read input from Serial and wait a new portion of
 // data
 #define ROUTER_STATUS_WAITING_NEXT_CHUNK_OF_INPUT 1
+// clear state, line_buffer is empty and we listening for input
 
 #define ROUTER_STATUS_ERROR 2
 
@@ -58,6 +59,7 @@ private:
   unsigned long lastCmdQSettedTime = 0;
   CmdsQueue *executingQ = NULL;
   byte analyzeLine(bool);
+  bool executingQInterrupted();
 };
 
 #endif /* SerialRouter_hpp */

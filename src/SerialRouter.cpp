@@ -25,7 +25,7 @@ void SerialRouter::resetExecutingQ() {
   }
 }
 
-int SerialRouter::available(){
+int SerialRouter::available() {
   if (executingQ) {
     if (millis() - lastCmdQSettedTime > OPERATION_TIMEOUT) {
       resetExecutingQ();
@@ -34,22 +34,32 @@ int SerialRouter::available(){
   return s->available();
 }
 
+bool SerialRouter::executingQInterrupted() {
+  if (strstr(lineBuffer, "+CMT: \"+79") != NULL) {
+    resetExecutingQ();
+    return true;
+  }
+  if (strcmp(lineBuffer, "RING") == 0) {
+    resetExecutingQ();
+    return true;
+  }
+  return false;
+}
+
 byte SerialRouter::analyzeLine(bool isFullLine) {
   lineBuffer[lineCursor] = '\0';
   lineCursor = 0;
   Serial.print("→");
   Serial.print(lineBuffer);
-  static InputListener *currentListener;
-  if (executingQ)
-    currentListener = (InputListener *)executingQ;
-  else
-    currentListener = eventsListener;
-  if (/*CmdQisFinished */ currentListener->newLineEvent(isFullLine)) {
-    resetExecutingQ();
-    return ROUTER_STATUS_LISTENING_FOR_INPUT;
-  } else {
-    return ROUTER_STATUS_WAITING_NEXT_CHUNK_OF_INPUT;
+  if (executingQ == NULL || executingQInterrupted())
+    eventsListener->newLineEvent(isFullLine); //simply process event
+  else {
+    if (executingQ->newLineEvent(isFullLine)) { /*Cmd Q is Finished */
+      resetExecutingQ();
+      return ROUTER_STATUS_LISTENING_FOR_INPUT;
+    }
   }
+  return ROUTER_STATUS_WAITING_NEXT_CHUNK_OF_INPUT;
 }
 
 RouterStatus SerialRouter::readInput() {

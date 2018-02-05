@@ -10,6 +10,7 @@
 #define Cmds_h
 
 #include "CmdsQueue.hpp"
+#include <Arduino.h>
 
 // class EchoOffCQ : public CmdsQueue {
 //   const char *cmds[1] = {"ATE0"};
@@ -29,4 +30,22 @@ public:
   }
 };
 
+const char* ringResetCall = "ATH";
+unsigned long ringLastRing = 0;
+byte ringCount = 0;
+
+class RingResetterCQ : public CmdsQueue {
+public:
+  RingResetterCQ(SerialRouter *sr):CmdsQueue(sr){}
+  const char *getCmd() override {
+    if (millis() - ringLastRing > 5000) {
+      ringLastRing = millis();
+      ringCount = 1;
+      return NULL;
+    }
+    ringCount++;
+    if(ringCount==4) return ringResetCall;
+    else return NULL;
+  }
+};
 #endif /* Cmds_h */

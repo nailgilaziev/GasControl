@@ -272,7 +272,7 @@ public:
 
 // RING и +CMT: + следующую строку надо ловить и передавать в events listener
   //ATH release all calls
-  const char *cmds[8] = {"AT+CPAS",//0
+  const char *cmds[12] = {"AT+CPAS",//0
                          "AT+CREG?",  //1
                          "AT+CSQ",    //2
                          "AT+XISP=0", //3

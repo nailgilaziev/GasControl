@@ -9,7 +9,10 @@
 #ifndef CmdsQueue_hpp
 #define CmdsQueue_hpp
 
-#include "InputListener.hpp"
+#include <Arduino.h>
+
+
+typedef bool CmdQisFinished;
 
 extern const char* RESPONSE_ERROR;
 extern const char* RESPONSE_OK;
@@ -19,12 +22,11 @@ struct ResponseMatcher{
   bool exactMatch;
 };
 
-class CmdsQueue : InputListener {
-protected:
-  byte executingCmdIndex = -1;
+class SerialRouter;
 
+class CmdsQueue  {
 public:
-  CmdsQueue(SerialRouter *sr):InputListener(sr){ };
+  CmdsQueue(SerialRouter *sr): sr(sr){ }
   virtual ~CmdsQueue(){};
 
   void executeCmd(const char*);
@@ -33,11 +35,14 @@ public:
   virtual ResponseMatcher successLineForCmd();
   virtual ResponseMatcher errorLineForCmd();
 
-  virtual CmdQisFinished newLineEvent(bool) override;
+  virtual CmdQisFinished newLineEvent(bool);
   virtual CmdQisFinished cmdSuccseed();
   virtual CmdQisFinished cmdFailed();
   virtual CmdQisFinished reactForSimpleLine();
 
+protected:
+  SerialRouter *sr;
+  byte executingCmdIndex = -1;
 };
 
 #endif /* CmdsQueue_hpp */

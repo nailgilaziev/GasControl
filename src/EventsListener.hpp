@@ -10,9 +10,7 @@
 #define EventsListener_hpp
 
 #include "CmdsQueue.hpp"
-#include "InputListener.hpp"
 
-#include "EventsListener.hpp"
 
 class SerialRouter;
 
@@ -22,11 +20,12 @@ struct EventAction {
   void (*actionFunc)();
 };
 
-class EventsListener : public InputListener {
+class EventsListener {
 public:
-  virtual CmdQisFinished newLineEvent(bool) override;
-  EventsListener(SerialRouter *sr):InputListener(sr){}
-  virtual ~EventsListener(){}
+  void newLineEvent(bool);
+  EventsListener(SerialRouter *sr) : sr(sr) {}
+protected:
+  SerialRouter *sr;
 };
 
 #endif /* EventsListener_hpp */
