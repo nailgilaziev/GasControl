@@ -11,14 +11,18 @@
 bool SerialRouter::routerIsBusy() { return executingQ != NULL; }
 
 void SerialRouter::executeQ(CmdsQueue *q) {
+  Serial.println(F("SCQ"));
   executingQ = q;
   lastCmdQSettedTime = millis();
-  executingQ->runQ();
+  if(executingQ->runQ()){
+    resetExecutingQ();
+    Serial.println(F(" <no exec cmd>"));
+  }
 }
 
 void SerialRouter::resetExecutingQ() {
   if (executingQ) {
-    Serial.println(F("RCQ"));
+    Serial.print(F("RCQ"));
     lastCmdQSettedTime = 0;
     delete executingQ;
     executingQ = NULL;
@@ -29,6 +33,7 @@ int SerialRouter::available() {
   if (executingQ) {
     if (millis() - lastCmdQSettedTime > OPERATION_TIMEOUT) {
       resetExecutingQ();
+      Serial.println(F(" <timeout>"));
     }
   }
   return s->available();
@@ -36,11 +41,15 @@ int SerialRouter::available() {
 
 bool SerialRouter::executingQInterrupted() {
   if (strstr(lineBuffer, "+CMT: \"+79") != NULL) {
+    Serial.println();
     resetExecutingQ();
+    Serial.println(F(" <interrupt>"));
     return true;
   }
   if (strcmp(lineBuffer, "RING") == 0) {
+    Serial.println();
     resetExecutingQ();
+    Serial.println(F(" <interrupt>"));
     return true;
   }
   return false;
@@ -56,6 +65,7 @@ byte SerialRouter::analyzeLine(bool isFullLine) {
   else {
     if (executingQ->newLineEvent(isFullLine)) { /*Cmd Q is Finished */
       resetExecutingQ();
+      Serial.print(F(" <CmdQisFinished>"));
       return ROUTER_STATUS_LISTENING_FOR_INPUT;
     }
   }

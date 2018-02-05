@@ -38,7 +38,6 @@ EventAction events[eventsCount] = {
 void EventsListener::newLineEvent(bool isFullLine) {
   for (byte i = 0; i < eventsCount; i++) {
     if (strncmp(events[i].event, sr->lineBuffer, strlen(events[i].event)) == 0) {
-      Serial.println(F("SCQ"));
       if (events[i].actionQ) {
         sr->executeQ(events[i].actionQ(sr));
       }

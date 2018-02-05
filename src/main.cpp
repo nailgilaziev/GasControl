@@ -56,13 +56,13 @@ Bounce rotaryDebouncerA = Bounce();
 // Data from sensors measured by intervals
 unsigned long lastMeasureTime = 0;
 //3600000
-#define MEASURE_INTERVAL 20000
+#define MEASURE_INTERVAL 140000
 
-const int pDHT = 3;
+const int pDHT = A4;
 SimpleDHT22 dht22;
 
 // Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS 4
+#define ONE_WIRE_BUS A3
 // Setup a oneWire instance to communicate with any OneWire devices (not just
 // Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
@@ -205,7 +205,7 @@ void rotaryDown() {
 bool measuredAfterStart = false;
 boolean timeToMeasure() {
   if (!measuredAfterStart) {
-    if (millis()>40000) {
+    if (millis()>5000) {
       measuredAfterStart = true;
       return true;
     }
@@ -227,6 +227,8 @@ const char *RESPONSE_TCPCLOSE_OK = "+TCPCLOSE:0,OK";
 class DataReportCQ : public CmdsQueue {
 
   bool skipSetupProcess;
+  int signalQualityRSSI = -1;
+  int signalQualityBER = -1;
 
 public:
   DataReportCQ(SerialRouter *sr) : CmdsQueue(sr) {
@@ -257,8 +259,27 @@ public:
     if (executingCmdIndex == 6) {
       return true;
     }
-    return false;
+    //parse SIGNAL QALITY RSSI BER values
+    if(executingCmdIndex==2) {
+      signalQualityRSSI = sr->lineBuffer[6]-'0';
+      int berInd;
+      if (sr->lineBuffer[7] != ',') {
+        signalQualityRSSI = signalQualityRSSI * 10 + sr->lineBuffer[7]-'0';
+        berInd = 9;
+      } else {
+        berInd = 8;
+      }
+      signalQualityBER = sr->lineBuffer[berInd]-'0';
+      if(sr->lineBuffer[berInd+1]!='\0'){
+        signalQualityBER = signalQualityBER * 10 + sr->lineBuffer[berInd+1]-'0';
+      }
+      Serial.print("signalQualityRSSI ");
+      Serial.println(signalQualityRSSI);
+      Serial.print("signalQualityBER ");
+      Serial.println(signalQualityBER);
   }
+  return false;
+}
 
   // CmdQisFinished newLineEvent(SerialRouter *sr) override {
   //   if (strstr(sr->lineBuffer, "Error"))
@@ -272,68 +293,72 @@ public:
 
 // RING и +CMT: + следующую строку надо ловить и передавать в events listener
   //ATH release all calls
-  const char *cmds[12] = {"AT+CPAS",//0
+  const char *cmds[3] = {"AT+CPAS",//0
                          "AT+CREG?",  //1
-                         "AT+CSQ",    //2
-                         "AT+XISP=0", //3
-                         "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"", //4
-                         "AT+XGAUTH=1,1,\"\",\"\"",     //5
-                         "AT+XIIC=1", //6
-                         "AT+XIIC?",  //7
-                         "AT+TCPSETUP=0,184.106.153.149,80",  //8
-                         "AT+TCPSEND=0,", //9
-                         "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
-                         "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
-                         "field6=%i HTTP/1.1\r\n"
-                         "Host: 184.106.153.149\r\n\r\n",  //10
-                         "AT+TCPCLOSE=0"//11
+                          "AT+CSQ"    //2
+                         // "AT+XISP=0", //3
+                         // "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"", //4
+                         // "AT+XGAUTH=1,1,\"\",\"\"",     //5
+                         // "AT+XIIC=1", //6
+                         // "AT+XIIC?",  //7
+                         // "AT+TCPSETUP=0,184.106.153.149,80",  //8
+                         // "AT+TCPSEND=0,", //9
+                         // "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
+                         // "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
+                         // "field6=%i HTTP/1.1\r\n"
+                         // "Host: 184.106.153.149\r\n\r\n",  //10
+                         // "AT+TCPCLOSE=0"//11
                        };
 
 
- CmdQisFinished cmdFailed() {
-   if (executingCmdIndex == 4) {
-     executingCmdIndex = 7;
-     internetSetupNeeded = true;
-     executeCmd(cmds[7]);
-   }
-   return false;
- }
+ // CmdQisFinished cmdFailed() {
+ //   if (executingCmdIndex == 4) {
+ //     executingCmdIndex = 7;
+ //     internetSetupNeeded = true;
+ //     executeCmd(cmds[7]);
+ //   }
+ //   return false;
+ // }
+
 
   char urlBuffer[155];
   const char *getCmd() override {
-    if (executingCmdIndex == 0 && skipSetupProcess) {
-      executingCmdIndex = 4;
-    }
-    if (executingCmdIndex >= 7) {
-      return NULL;
-    }
-    if (executingCmdIndex == 3)
-      delay(5000); // delay for connection
-    // if (executingCmdIndex == 5) {
-    //   // FIXME это должно быть не здесь. а в succseed и failure
-    //   internetSetupNeeded = false;
+    return NULL;
+    if(executingCmdIndex >=3) return NULL;
+    return cmds[executingCmdIndex];
+    // if (executingCmdIndex == 0 && skipSetupProcess) {
+    //   executingCmdIndex = 4;
     // }
-    if (executingCmdIndex != 5 && executingCmdIndex != 6)
-      return cmds[executingCmdIndex];
-
-    sprintf(urlBuffer, cmds[6], rawData[GAS_TEMP_OUTPUT],
-            rawData[GAS_TEMP_INPUT], rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY],
-            rawData[GAS_TARGET_TEMP], isBooted);
-
-    // Serial.print("transformed ");
-    // Serial.print(transformed);
-    if (executingCmdIndex == 5) {
-      char l[4];
-      itoa(strlen(urlBuffer), l, 10);
-      // Serial.print("<len>");
-      // Serial.print(l);
-      strcpy(urlBuffer, cmds[executingCmdIndex]);
-      strcat(urlBuffer, l);
-      return urlBuffer;
-    }
-    isBooted = 0;
-    internetSetupNeeded = false;
-    return urlBuffer;
+    // if (executingCmdIndex >= 7) {
+    //   return NULL;
+    // }
+    // if (executingCmdIndex == 3)
+    //   delay(5000); // delay for connection
+    // // if (executingCmdIndex == 5) {
+    // //   // FIXME это должно быть не здесь. а в succseed и failure
+    // //   internetSetupNeeded = false;
+    // // }
+    // if (executingCmdIndex != 5 && executingCmdIndex != 6)
+    //   return cmds[executingCmdIndex];
+    //
+    // sprintf(urlBuffer, cmds[6], rawData[GAS_TEMP_OUTPUT],
+    //         rawData[GAS_TEMP_INPUT], rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY],
+    //         rawData[GAS_TARGET_TEMP], isBooted);
+    //
+    // // Serial.print("transformed ");
+    // // Serial.print(transformed);
+    // if (executingCmdIndex == 5) {
+    //   char l[4];
+    //   itoa(strlen(urlBuffer), l, 10);
+    //   // Serial.print("<len>");
+    //   // Serial.print(l);
+    //   strcpy(urlBuffer, cmds[executingCmdIndex]);
+    //   strcat(urlBuffer, l);
+    //   return urlBuffer;
+    // }
+    // isBooted = 0;
+    // internetSetupNeeded = false;
+    // return urlBuffer;
   }
 };
 
@@ -344,29 +369,33 @@ void measureTemps() {
   sensors.requestTemperatures(); // Send the command to get temperatures
   int tin = (int)sensors.getTempCByIndex(0);
   rawData[GAS_TEMP_INPUT] = tin;
-  // Serial.print(tin);
-  // Serial.print(" *C->[]->");
+  Serial.print(tin);
+  Serial.print(" *C->[]->");
   int tout = sensors.getTempCByIndex(1);
   rawData[GAS_TEMP_OUTPUT] = tout;
-  Serial.println(tout);
-  // Serial.println(" *C");
+  Serial.print(tout);
+  Serial.println(" *C");
+
+  delay(100);
 
   float temperature = 0;
   float humidity = 0;
   int err = SimpleDHTErrSuccess;
   if ((err = dht22.read2(pDHT, &temperature, &humidity, NULL)) !=
       SimpleDHTErrSuccess) {
-    // Serial.print(F("Read DHT22 failed, err="));
-    // Serial.println(err);
+    Serial.print(F("Read DHT22 failed, err="));
+    Serial.println(err);
     return;
   }
   rawData[ROOM_HUMIDITY] = humidity;
   rawData[ROOM_TEMP] = temperature;
 
-  // Serial.println((float)temperature);
-  // // Serial.print(" *C, ");
-  // Serial.println((float)humidity);
-  // Serial.println(" RH%");
+  Serial.print((float)temperature);
+  Serial.print(" *C, ");
+  Serial.print((float)humidity);
+  Serial.println(" RH%");
+
+  delay(100);
 
   if (router.routerIsBusy()) return;
   router.executeQ(new DataReportCQ(&router));

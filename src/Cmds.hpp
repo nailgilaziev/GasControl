@@ -30,21 +30,27 @@ public:
   }
 };
 
-const char* ringResetCall = "ATH";
-unsigned long ringLastRing = 0;
-byte ringCount = 0;
+const char *ringCmds[2] = {"ATH","AT+CFUN=15"};
+
 
 class RingResetterCQ : public CmdsQueue {
 public:
   RingResetterCQ(SerialRouter *sr):CmdsQueue(sr){}
   const char *getCmd() override {
-    if (millis() - ringLastRing > 5000) {
-      ringLastRing = millis();
+    static unsigned long lastRing = 0;
+    static byte ringCount = 0;
+    if (millis() - lastRing > 8000) {
+      lastRing = millis();
       ringCount = 1;
       return NULL;
     }
+    lastRing = millis();
     ringCount++;
-    if(ringCount==4) return ringResetCall;
+    if(ringCount==4) return ringCmds[0];
+    if(executingCmdIndex == 1) {
+      delay(600); //for user who call
+      return ringCmds[1];
+    }
     else return NULL;
   }
 };

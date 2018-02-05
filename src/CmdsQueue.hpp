@@ -30,7 +30,7 @@ public:
   virtual ~CmdsQueue(){};
 
   void executeCmd(const char*);
-  void runQ();
+  CmdQisFinished runQ();
   virtual const char* getCmd();
   virtual ResponseMatcher successLineForCmd();
   virtual ResponseMatcher errorLineForCmd();

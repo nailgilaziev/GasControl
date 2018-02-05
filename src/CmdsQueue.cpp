@@ -28,12 +28,14 @@ void CmdsQueue::executeCmd(const char *cmd) {
 
 const char *CmdsQueue::getCmd() { return NULL; }
 
-void CmdsQueue::runQ(){
+CmdQisFinished CmdsQueue::runQ(){
   executingCmdIndex = 0;
   const char *cmd = getCmd();
-  if (cmd == NULL)
+  if (cmd == NULL){
     return true;
+  }
   executeCmd(cmd);
+  return false;
 }
 
 ResponseMatcher CmdsQueue::successLineForCmd() {
