@@ -15,7 +15,7 @@
 
 #ifndef LINE_BUFFER_SIZE
 // maximum is 255 because lineCursor is int8_t type
-#define LINE_BUFFER_SIZE 32
+#define LINE_BUFFER_SIZE 48
 #endif
 
 #define CR 13
@@ -59,7 +59,7 @@ private:
   unsigned long lastCmdQSettedTime = 0;
   CmdsQueue *executingQ = NULL;
   byte analyzeLine(bool);
-  bool executingQInterrupted();
+  bool executingQInterrupted(bool);
 };
 
 #endif /* SerialRouter_hpp */

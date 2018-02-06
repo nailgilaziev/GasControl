@@ -56,7 +56,7 @@ Bounce rotaryDebouncerA = Bounce();
 // Data from sensors measured by intervals
 unsigned long lastMeasureTime = 0;
 //3600000
-#define MEASURE_INTERVAL 140000
+#define MEASURE_INTERVAL 440000
 
 const int pDHT = A4;
 SimpleDHT22 dht22;
@@ -305,7 +305,7 @@ public:
                          // "AT+TCPSEND=0,", //9
                          // "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
                          // "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
-                         // "field6=%i HTTP/1.1\r\n"
+                         // "field6=%i&field7=%i&field8=%i HTTP/1.1\r\n"
                          // "Host: 184.106.153.149\r\n\r\n",  //10
                          // "AT+TCPCLOSE=0"//11
                        };
@@ -343,7 +343,7 @@ public:
     //
     // sprintf(urlBuffer, cmds[6], rawData[GAS_TEMP_OUTPUT],
     //         rawData[GAS_TEMP_INPUT], rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY],
-    //         rawData[GAS_TARGET_TEMP], isBooted);
+    //         rawData[GAS_TARGET_TEMP], isBooted, signalQualityRSSI, signalQualityBER);
     //
     // // Serial.print("transformed ");
     // // Serial.print(transformed);
@@ -367,11 +367,11 @@ void measureTemps() {
 
   // erial.println("Requesting temperatures...");
   sensors.requestTemperatures(); // Send the command to get temperatures
-  int tin = (int)sensors.getTempCByIndex(0);
+  int tin = (int)sensors.getTempCByIndex(1);
   rawData[GAS_TEMP_INPUT] = tin;
   Serial.print(tin);
   Serial.print(" *C->[]->");
-  int tout = sensors.getTempCByIndex(1);
+  int tout = sensors.getTempCByIndex(0);
   rawData[GAS_TEMP_OUTPUT] = tout;
   Serial.print(tout);
   Serial.println(" *C");

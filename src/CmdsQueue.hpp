@@ -30,7 +30,7 @@ public:
   virtual ~CmdsQueue(){};
 
   void executeCmd(const char*);
-  CmdQisFinished runQ();
+  virtual CmdQisFinished runQ();
   virtual const char* getCmd();
   virtual ResponseMatcher successLineForCmd();
   virtual ResponseMatcher errorLineForCmd();
@@ -42,7 +42,7 @@ public:
 
 protected:
   SerialRouter *sr;
-  byte executingCmdIndex = -1;
+  byte executingCmdIndex = 255;
 };
 
 #endif /* CmdsQueue_hpp */

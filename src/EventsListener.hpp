@@ -12,6 +12,8 @@
 #include "CmdsQueue.hpp"
 
 
+typedef bool EventIsPresented;
+
 class SerialRouter;
 
 struct EventAction {
@@ -22,7 +24,8 @@ struct EventAction {
 
 class EventsListener {
 public:
-  void newLineEvent(bool);
+  //isFullLine param is ignored
+  EventIsPresented newLineEvent(bool isFullLine,bool dryRun = false);
   EventsListener(SerialRouter *sr) : sr(sr) {}
 protected:
   SerialRouter *sr;

@@ -39,14 +39,13 @@ int SerialRouter::available() {
   return s->available();
 }
 
-bool SerialRouter::executingQInterrupted() {
-  if (strstr(lineBuffer, "+CMT: \"+79") != NULL) {
-    Serial.println();
-    resetExecutingQ();
-    Serial.println(F(" <interrupt>"));
-    return true;
+bool SerialRouter::executingQInterrupted(bool isFullLine) {
+  if (!isFullLine) {
+    Serial.println(F("NOT A FULL LINE. INTERRUPTION NOT POSSIBLE"));
+    return false;
   }
-  if (strcmp(lineBuffer, "RING") == 0) {
+  if (eventsListener->newLineEvent(isFullLine, true)) { //dryRun
+    // Event is presented in events listener - so interrupt execution
     Serial.println();
     resetExecutingQ();
     Serial.println(F(" <interrupt>"));
@@ -60,12 +59,14 @@ byte SerialRouter::analyzeLine(bool isFullLine) {
   lineCursor = 0;
   Serial.print("→");
   Serial.print(lineBuffer);
-  if (executingQ == NULL || executingQInterrupted())
+  if (executingQ == NULL || executingQInterrupted(isFullLine)){
+    Serial.println();
     eventsListener->newLineEvent(isFullLine); //simply process event
+  }
   else {
     if (executingQ->newLineEvent(isFullLine)) { /*Cmd Q is Finished */
       resetExecutingQ();
-      Serial.print(F(" <CmdQisFinished>"));
+      Serial.println(F(" <CmdQisFinished>"));
       return ROUTER_STATUS_LISTENING_FOR_INPUT;
     }
   }

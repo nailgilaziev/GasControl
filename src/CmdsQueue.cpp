@@ -22,8 +22,7 @@ void CmdsQueue::executeCmd(const char *cmd) {
     sr->s->write(c);
   }
   sr->s->write(CR);
-  // sr->s->write(LF);
-  return false;
+  //sr->s->write(LF);
 }
 
 const char *CmdsQueue::getCmd() { return NULL; }
@@ -47,6 +46,7 @@ ResponseMatcher CmdsQueue::errorLineForCmd() {
 }
 
 CmdQisFinished CmdsQueue::cmdSuccseed() {
+  //previous command succeed so launch next command
   executingCmdIndex++;
   const char *cmd = getCmd();
   if (cmd == NULL)

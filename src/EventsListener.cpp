@@ -17,32 +17,34 @@ CmdsQueue *configereSms(SerialRouter *sr) { return new ConfigureCQ(sr); }
 
 CmdsQueue *ringInterrupter(SerialRouter *sr) { return new RingResetterCQ(sr); }
 
-// CmdsQueue *reactOnSms() { return NULL; }
+CmdsQueue *reactOnSms(SerialRouter *sr) { return new SmsReactorCQ(sr); }
 
 // ring мы будем игнорировать
 //надо слушать 003
 //далее мы будем слушать
 //смс a25 - установка авто режима и температуры 25 в комнате
 //смс m60 - установка ручного режима на котле в 60 градусов
-const int eventsCount = 2;
+const int eventsCount = 3;
 EventAction events[eventsCount] = {
     // {"MODEM:STARTUP", &echoOff, NULL},
     {"+PBREADY", &configereSms, NULL},
-    {"RING", &ringInterrupter, NULL}
-    //{"+CMT: \"+79047612279\"", &reactOnSms, NULL},
+    {"RING", &ringInterrupter, NULL},
+    {"+CMT: \"+79", &reactOnSms, NULL}
 };
 
 
 
 
-void EventsListener::newLineEvent(bool isFullLine) {
+EventIsPresented EventsListener::newLineEvent(bool isFullLine, bool dryRun) {
   for (byte i = 0; i < eventsCount; i++) {
     if (strncmp(events[i].event, sr->lineBuffer, strlen(events[i].event)) == 0) {
-      if (events[i].actionQ) {
-        sr->executeQ(events[i].actionQ(sr));
-      }
-      if (events[i].actionFunc) {
-        events[i].actionFunc();
+      if (dryRun == false) {
+        if (events[i].actionQ) {
+          sr->executeQ(events[i].actionQ(sr));
+        }
+        if (events[i].actionFunc) {
+          events[i].actionFunc();
+        }
       }
       return true;
     }
