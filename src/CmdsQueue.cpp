@@ -34,11 +34,12 @@ CmdQisFinished CmdsQueue::runQ(){
     return true;
   }
   executeCmd(cmd);
-  executedCmdIndex = 0;
+  executedCmdIndex++;
   return false;
 }
 
 CmdQisFinished CmdsQueue::cmdSuccseed() {
+  Serial.println();
   //previous command succeed so launch next command
   const char *cmd = getCmd(executedCmdIndex+1);
   if (cmd == NULL)
@@ -49,11 +50,13 @@ CmdQisFinished CmdsQueue::cmdSuccseed() {
 }
 
 CmdQisFinished CmdsQueue::cmdFailed() {
+  Serial.println();
   return true;
 }
 
 
 CmdQisFinished CmdsQueue::reactForSimpleLine() {
+  Serial.println();
   return false;
 }
 
@@ -73,13 +76,10 @@ bool CmdsQueue::responseIs(const char * str, bool exactMatch) {
 
 CmdQisFinished CmdsQueue::newLineEvent(bool isFullLine) {
   if (responseIs("OK")) {
-    Serial.println();
     return cmdSuccseed();
   }
   if (responseIs("ERROR")) {
-    Serial.println();
     return cmdFailed();
   }
-  Serial.println();
   return reactForSimpleLine();
 }
