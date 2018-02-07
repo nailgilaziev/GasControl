@@ -9,8 +9,7 @@
 #include "CmdsQueue.hpp"
 #include "SerialRouter.hpp"
 
-const char* RESPONSE_ERROR = "ERROR";
-const char* RESPONSE_OK = "OK";
+
 
 void CmdsQueue::executeCmd(const char *cmd) {
  Serial.print(F("←"));
@@ -25,33 +24,27 @@ void CmdsQueue::executeCmd(const char *cmd) {
   //sr->s->write(LF);
 }
 
-const char *CmdsQueue::getCmd() { return NULL; }
+const char *CmdsQueue::getCmd(byte ind) { return NULL; }
 
 CmdQisFinished CmdsQueue::runQ(){
-  executingCmdIndex = 0;
-  const char *cmd = getCmd();
+  // When you start you executedCmdIndex = 255
+  // and you can read last lineBuffer (response from modem)
+  const char *cmd = getCmd(0);
   if (cmd == NULL){
     return true;
   }
   executeCmd(cmd);
+  executedCmdIndex = 0;
   return false;
-}
-
-ResponseMatcher CmdsQueue::successLineForCmd() {
-  return (ResponseMatcher) {RESPONSE_OK, true};
-}
-
-ResponseMatcher CmdsQueue::errorLineForCmd() {
-  return (ResponseMatcher) {RESPONSE_ERROR, true};
 }
 
 CmdQisFinished CmdsQueue::cmdSuccseed() {
   //previous command succeed so launch next command
-  executingCmdIndex++;
-  const char *cmd = getCmd();
+  const char *cmd = getCmd(executedCmdIndex+1);
   if (cmd == NULL)
     return true;
   executeCmd(cmd);
+  executedCmdIndex++;
   return false;
 }
 
@@ -59,30 +52,31 @@ CmdQisFinished CmdsQueue::cmdFailed() {
   return true;
 }
 
+
 CmdQisFinished CmdsQueue::reactForSimpleLine() {
   return false;
 }
 
-bool matched(const char *lineBuffer, ResponseMatcher rule) {
-  if (rule.exactMatch) {
+bool CmdsQueue::responseIs(const char * str, bool exactMatch) {
+  if (exactMatch) {
     Serial.print('[');
-    Serial.print(rule.str);
+    Serial.print(str);
     Serial.print(']');
-    return strcmp(lineBuffer, rule.str) == 0;
+    return strcmp(sr->lineBuffer, str) == 0;
   } else {
     Serial.print('(');
-    Serial.print(rule.str);
+    Serial.print(str);
     Serial.print(')');
-    return strstr(lineBuffer, rule.str) != NULL;
+    return strstr(sr->lineBuffer, str) != NULL;
   }
 }
 
 CmdQisFinished CmdsQueue::newLineEvent(bool isFullLine) {
-  if (matched(sr->lineBuffer, successLineForCmd())) {
+  if (responseIs("OK")) {
     Serial.println();
     return cmdSuccseed();
   }
-  if (matched(sr->lineBuffer, errorLineForCmd())) {
+  if (responseIs("ERROR")) {
     Serial.println();
     return cmdFailed();
   }

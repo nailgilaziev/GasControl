@@ -14,7 +14,7 @@
  */
 #include "ProjectData.h"
 #include "SerialRouter.hpp"
-#include <AccelStepper.h>
+//#include <AccelStepper.h>
 //#include "NokiaDisplay.h"
 #include <Bounce2.h>
 #include <DallasTemperature.h>
@@ -69,7 +69,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
-AccelStepper stepper(4, 4, 6, 3, 5);
+//AccelStepper stepper(4, 4, 6, 3, 5);
 int8_t rawData[8];
 
 //NokiaDisplay display = NokiaDisplay(rawData);
@@ -118,7 +118,7 @@ void setup(void) {
   }
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(9600);
-  Serial.println("Started");
+  Serial.println(F("Started"));
 
   gsmSerial.begin(9600);
   //display.init();
@@ -141,7 +141,7 @@ void setup(void) {
   sensors.begin();
   executionStatusCode = 1;
 
-  stepper.setAcceleration(200);
+  //stepper.setAcceleration(200);
 }
 
 boolean needAutomaticallySwitchOffDisplay() {
@@ -218,12 +218,6 @@ byte isBooted = 1;
 
 bool internetSetupNeeded = true;
 
-const char *RESPONSE_TCPSETUP_OK = "+TCPSETUP:0,OK";
-const char *RESPONSE_TCPSETUP_ERROR = "+TCPSETUP:";
-const char *RESPONSE_TCPSEND_OK = ">";
-const char *RESPONSE_CONTAINS_ERROR = "error";
-const char *RESPONSE_TCPCLOSE_OK = "+TCPCLOSE:0,OK";
-
 class DataReportCQ : public CmdsQueue {
 
   bool skipSetupProcess;
@@ -235,32 +229,100 @@ public:
     skipSetupProcess = !internetSetupNeeded;
   }
 
-  ResponseMatcher successLineForCmd() {
-    switch (executingCmdIndex) {
-    case 4:
-      return (ResponseMatcher){RESPONSE_TCPSETUP_OK, true};
-    case 5:
-      return (ResponseMatcher){RESPONSE_TCPSEND_OK, true};
-    case 7:
-      return (ResponseMatcher){RESPONSE_TCPCLOSE_OK, true};
+  CmdQisFinished newLineEvent(bool isFullLine) override {
+    if(executedCmdIndex==8){
+      if (responseIs("+TCPSETUP:0,OK")) return cmdSuccseed();
+      if (responseIs("+TCPSETUP:",false)) return cmdFailed();
+      return reactForSimpleLine();
     }
-    return CmdsQueue::successLineForCmd();
-  }
-  ResponseMatcher errorLineForCmd() {
-    switch (executingCmdIndex) {
-    case 4:
-      return (ResponseMatcher){RESPONSE_TCPSETUP_ERROR, false};
-    case 5:
-      return (ResponseMatcher){RESPONSE_CONTAINS_ERROR, false};
+    if(executedCmdIndex==10){
+      if (responseIs(">")) return cmdSuccseed();
+      if (responseIs("+TCPSEND:",false)) return cmdFailed();
+      return reactForSimpleLine();
     }
-    return CmdsQueue::errorLineForCmd();
+    if(executedCmdIndex==11){
+      if (responseIs("+TCPSEND:0,")) return cmdSuccseed();
+      if (responseIs("+TCPSEND:",false)) return cmdFailed();
+      return reactForSimpleLine();
+    }
+    if(executedCmdIndex==11){
+      if (responseIs("+TCPCLOSE:0,OK")) return cmdSuccseed();
+      if (responseIs("+TCPCLOSE:",false)) return cmdFailed();
+      return reactForSimpleLine();
+    }
+    return CmdsQueue::newLineEvent(isFullLine);
   }
+
+// RING и +CMT: + следующую строку надо ловить и передавать в events listener
+  //ATH release all calls
+  const char *cmds[13] = {"AT+CPAS",//0
+                         "AT+CREG?",  //1
+                         "AT+XISP=0", //2
+                         "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"", //3
+                         "AT+XGAUTH=1,1,\"\",\"\"",     //4
+                         "AT+XIIC=1", //5
+                         "AT+XIIC?", //6
+                         "AT+CSQ",  //7
+                         "AT+TCPSETUP=0,184.106.153.149,80",  //8
+                         "AT+IPSTATUS=0",//9
+                         "AT+TCPSEND=0,", //10
+                         "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
+                         "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
+                         "field6=%i&field7=%i&field8=%i HTTP/1.1\r\n"
+                         "Host: 184.106.153.149\r\n\r\n",  //11
+                         "AT+TCPCLOSE=0"//12
+                       };
+
+
+ CmdQisFinished cmdFailed() {
+   executedCmdIndex = 255;
+   internetSetupNeeded = true;
+   executeCmd(getCmd(0));
+   return false;
+ }
+
+
+  char urlBuffer[200];
+
+  const char *getCmd(byte ind) override {
+    if (ind == 0 && skipSetupProcess) {
+      //if further in line problem exist, we NOT skip process
+      skipSetupProcess = false;
+      executedCmdIndex = 7;
+    }
+    if (ind >= 12) {
+      return NULL;
+    }
+    if (ind == 6) delay(4000); // delay for obtain IP
+    if (ind != 10 && ind != 11)
+      return cmds[ind];
+
+    sprintf(urlBuffer, cmds[6], rawData[GAS_TEMP_OUTPUT],
+            rawData[GAS_TEMP_INPUT], rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY],
+            rawData[GAS_TARGET_TEMP], isBooted, signalQualityRSSI, signalQualityBER);
+
+    Serial.print(F("<<buff length>>="));
+    Serial.println(strlen(urlBuffer));
+    if (ind == 10) {
+      char l[4];
+      itoa(strlen(urlBuffer), l, 10);
+      strcpy(urlBuffer, cmds[ind]);
+      strcat(urlBuffer, l);
+      return urlBuffer;
+    }
+    isBooted = 0;
+    internetSetupNeeded = false;
+    return urlBuffer;
+  }
+
   CmdQisFinished reactForSimpleLine() {
-    if (executingCmdIndex == 6) {
-      return true;
+    if (executedCmdIndex == 6) {
+      if (responseIs("0.0.0.0", false)) {
+        cmdFailed();
+      }
     }
-    //parse SIGNAL QALITY RSSI BER values
-    if(executingCmdIndex==2) {
+    //parse SIGNAL QALITY RSSI AND BER values
+    if(executedCmdIndex==7) {
       signalQualityRSSI = sr->lineBuffer[6]-'0';
       int berInd;
       if (sr->lineBuffer[7] != ',') {
@@ -273,93 +335,13 @@ public:
       if(sr->lineBuffer[berInd+1]!='\0'){
         signalQualityBER = signalQualityBER * 10 + sr->lineBuffer[berInd+1]-'0';
       }
-      Serial.print("signalQualityRSSI ");
+      Serial.print(F("signalQualityRSSI "));
       Serial.println(signalQualityRSSI);
-      Serial.print("signalQualityBER ");
+      Serial.print(F("signalQualityBER "));
       Serial.println(signalQualityBER);
   }
   return false;
 }
-
-  // CmdQisFinished newLineEvent(SerialRouter *sr) override {
-  //   if (strstr(sr->lineBuffer, "Error"))
-  //     return true;
-  //   if (strstr(sr->lineBuffer, "0.0.0.0")) {
-  //     internetSetupNeeded = true;
-  //     return true;
-  //   }
-  //   return false;
-  // }
-
-// RING и +CMT: + следующую строку надо ловить и передавать в events listener
-  //ATH release all calls
-  const char *cmds[3] = {"AT+CPAS",//0
-                         "AT+CREG?",  //1
-                          "AT+CSQ"    //2
-                         // "AT+XISP=0", //3
-                         // "AT+CGDCONT=1,\"IP\",\"internet.tele2.ru\"", //4
-                         // "AT+XGAUTH=1,1,\"\",\"\"",     //5
-                         // "AT+XIIC=1", //6
-                         // "AT+XIIC?",  //7
-                         // "AT+TCPSETUP=0,184.106.153.149,80",  //8
-                         // "AT+TCPSEND=0,", //9
-                         // "GET /update?api_key=XB08GLN5246NL2K6&headers=false&"
-                         // "field1=%i&field2=%i&field3=%i&field4=%i&field5=5%i&"
-                         // "field6=%i&field7=%i&field8=%i HTTP/1.1\r\n"
-                         // "Host: 184.106.153.149\r\n\r\n",  //10
-                         // "AT+TCPCLOSE=0"//11
-                       };
-
-
- // CmdQisFinished cmdFailed() {
- //   if (executingCmdIndex == 4) {
- //     executingCmdIndex = 7;
- //     internetSetupNeeded = true;
- //     executeCmd(cmds[7]);
- //   }
- //   return false;
- // }
-
-
-  char urlBuffer[155];
-  const char *getCmd() override {
-    return NULL;
-    if(executingCmdIndex >=3) return NULL;
-    return cmds[executingCmdIndex];
-    // if (executingCmdIndex == 0 && skipSetupProcess) {
-    //   executingCmdIndex = 4;
-    // }
-    // if (executingCmdIndex >= 7) {
-    //   return NULL;
-    // }
-    // if (executingCmdIndex == 3)
-    //   delay(5000); // delay for connection
-    // // if (executingCmdIndex == 5) {
-    // //   // FIXME это должно быть не здесь. а в succseed и failure
-    // //   internetSetupNeeded = false;
-    // // }
-    // if (executingCmdIndex != 5 && executingCmdIndex != 6)
-    //   return cmds[executingCmdIndex];
-    //
-    // sprintf(urlBuffer, cmds[6], rawData[GAS_TEMP_OUTPUT],
-    //         rawData[GAS_TEMP_INPUT], rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY],
-    //         rawData[GAS_TARGET_TEMP], isBooted, signalQualityRSSI, signalQualityBER);
-    //
-    // // Serial.print("transformed ");
-    // // Serial.print(transformed);
-    // if (executingCmdIndex == 5) {
-    //   char l[4];
-    //   itoa(strlen(urlBuffer), l, 10);
-    //   // Serial.print("<len>");
-    //   // Serial.print(l);
-    //   strcpy(urlBuffer, cmds[executingCmdIndex]);
-    //   strcat(urlBuffer, l);
-    //   return urlBuffer;
-    // }
-    // isBooted = 0;
-    // internetSetupNeeded = false;
-    // return urlBuffer;
-  }
 };
 
 void measureTemps() {

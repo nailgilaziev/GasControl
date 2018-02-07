@@ -40,10 +40,6 @@ int SerialRouter::available() {
 }
 
 bool SerialRouter::executingQInterrupted(bool isFullLine) {
-  if (!isFullLine) {
-    Serial.println(F("NOT A FULL LINE. INTERRUPTION NOT POSSIBLE"));
-    return false;
-  }
   if (eventsListener->newLineEvent(isFullLine, true)) { //dryRun
     // Event is presented in events listener - so interrupt execution
     Serial.println();

@@ -31,18 +31,18 @@ public:
 
   void executeCmd(const char*);
   virtual CmdQisFinished runQ();
-  virtual const char* getCmd();
-  virtual ResponseMatcher successLineForCmd();
-  virtual ResponseMatcher errorLineForCmd();
+  virtual const char* getCmd(byte);
 
   virtual CmdQisFinished newLineEvent(bool);
   virtual CmdQisFinished cmdSuccseed();
   virtual CmdQisFinished cmdFailed();
+  //сюда могут сыпаться хвосты обрезанных строк, не только с начала isFullLine
   virtual CmdQisFinished reactForSimpleLine();
 
 protected:
+  virtual bool responseIs(const char *, bool = true);
   SerialRouter *sr;
-  byte executingCmdIndex = 255;
+  byte executedCmdIndex = 255;
 };
 
 #endif /* CmdsQueue_hpp */
