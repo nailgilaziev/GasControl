@@ -11,27 +11,26 @@
 
 #include <Arduino.h>
 
-
 typedef bool CmdQisFinished;
 
-extern const char* RESPONSE_ERROR;
-extern const char* RESPONSE_OK;
+extern const char *RESPONSE_ERROR;
+extern const char *RESPONSE_OK;
 
-struct ResponseMatcher{
-  const char * str;
+struct ResponseMatcher {
+  const char *str;
   bool exactMatch;
 };
 
 class SerialRouter;
 
-class CmdsQueue  {
+class CmdsQueue {
 public:
-  CmdsQueue(SerialRouter *sr): sr(sr){ }
+  CmdsQueue(SerialRouter *sr) : sr(sr) {}
   virtual ~CmdsQueue(){};
 
-  void executeCmd(const char*);
+  void executeCmd(const char *);
   virtual CmdQisFinished runQ();
-  virtual const char* getCmd(byte);
+  virtual const char *getCmd(byte);
 
   virtual CmdQisFinished newLineEvent(bool);
   virtual CmdQisFinished cmdSuccseed();

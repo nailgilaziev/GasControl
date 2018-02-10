@@ -15,17 +15,20 @@ void NokiaDisplay::init() {
 void NokiaDisplay::update() {
   int8_t t = rawData[DISPLAY_MODE];
   digitalWrite(pLIGHT, t == DISPLAY_OFF);
-  if (t == DISPLAY_MENU)
-    displayMenuMode();
-  else
+  // if (t == DISPLAY_MENU)
+  //   displayMenuMode();
+  // else
     displayInfoMode();
 }
 
 String NokiaDisplay::getData(uint8_t key) {
   int8_t v = rawData[key];
-  v = constrain(v, -10, 99);
+  v = constrain(v, -10, 100);
   if (v < -9)
     return "-#"; // display can't display 3 digits value. Show error
+  if (v > 99) {
+    return "##"; //DHT READ ERROR for example
+  }
   String res = String(v);
   if (key == ROOM_TEMP)
     return res;
@@ -85,7 +88,7 @@ void NokiaDisplay::displayInfoMode() {
   d.setTextSize(2);
   d.print(getData(GAS_TARGET_TEMP));
 
-  if (rawData[SELECTED_MENU] == 0) {
+  if (rawData[SELECTED_MENU] == SELECTED_MENU_AUTOMATIC) {
     // climat control indicator
     d.setCursor(0, 24);
     d.setTextSize(1);
@@ -97,7 +100,7 @@ void NokiaDisplay::displayInfoMode() {
     d.setTextColor(WHITE);
     d.print(getData(CLIM_TARGET_TEMP));
   }
-  if (rawData[SELECTED_MENU] == 2) {
+  if (rawData[SELECTED_MENU] == SELECTED_MENU_CALIBRATION) {
     d.setCursor(0, 20);
     d.setTextSize(2);
     d.setTextColor(BLACK);
@@ -118,22 +121,22 @@ void NokiaDisplay::displayInfoMode() {
   d.display();
 }
 
-void NokiaDisplay::displayMenuMode() {
-  d.clearDisplay();
-  d.setFont(NULL);
-  d.setTextSize(1);
-  d.setCursor(0, 10);
-
-  String menus[3];
-  menus[0] = "automatic";
-  menus[1] = "manual";
-  menus[2] = "calibration";
-  for (byte i = 0; i < 3; i++) {
-    if (rawData[SELECTED_MENU] == i)
-      d.setTextColor(WHITE, BLACK);
-    else
-      d.setTextColor(BLACK);
-    d.println(menus[i]);
-  }
-  d.display();
-}
+// void NokiaDisplay::displayMenuMode() {
+//   d.clearDisplay();
+//   d.setFont(NULL);
+//   d.setTextSize(1);
+//   d.setCursor(0, 10);
+//
+//   String menus[3];
+//   menus[0] = "automatic";
+//   menus[1] = "manual";
+//   menus[2] = "calibration";
+//   for (byte i = 0; i < 3; i++) {
+//     if (rawData[SELECTED_MENU] == i)
+//       d.setTextColor(WHITE, BLACK);
+//     else
+//       d.setTextColor(BLACK);
+//     d.println(menus[i]);
+//   }
+//   d.display();
+// }

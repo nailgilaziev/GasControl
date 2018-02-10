@@ -9,10 +9,8 @@
 #include "CmdsQueue.hpp"
 #include "SerialRouter.hpp"
 
-
-
 void CmdsQueue::executeCmd(const char *cmd) {
- Serial.print(F("←"));
+  Serial.print(F("←"));
   Serial.println(cmd);
   for (int i = 0; true; i++) {
     char c = cmd[i];
@@ -21,16 +19,16 @@ void CmdsQueue::executeCmd(const char *cmd) {
     sr->s->write(c);
   }
   sr->s->write(CR);
-  //sr->s->write(LF);
+  // sr->s->write(LF);
 }
 
 const char *CmdsQueue::getCmd(byte ind) { return NULL; }
 
-CmdQisFinished CmdsQueue::runQ(){
+CmdQisFinished CmdsQueue::runQ() {
   // When you start you executedCmdIndex = 255
   // and you can read last lineBuffer (response from modem)
   const char *cmd = getCmd(0);
-  if (cmd == NULL){
+  if (cmd == NULL) {
     return true;
   }
   executeCmd(cmd);
@@ -40,8 +38,8 @@ CmdQisFinished CmdsQueue::runQ(){
 
 CmdQisFinished CmdsQueue::cmdSuccseed() {
   Serial.println();
-  //previous command succeed so launch next command
-  const char *cmd = getCmd(executedCmdIndex+1);
+  // previous command succeed so launch next command
+  const char *cmd = getCmd(executedCmdIndex + 1);
   if (cmd == NULL)
     return true;
   executeCmd(cmd);
@@ -54,13 +52,12 @@ CmdQisFinished CmdsQueue::cmdFailed() {
   return true;
 }
 
-
 CmdQisFinished CmdsQueue::reactForSimpleLine() {
   Serial.println();
   return false;
 }
 
-bool CmdsQueue::responseIs(const char * str, bool exactMatch) {
+bool CmdsQueue::responseIs(const char *str, bool exactMatch) {
   if (exactMatch) {
     Serial.print('[');
     Serial.print(str);

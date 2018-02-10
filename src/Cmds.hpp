@@ -12,38 +12,25 @@
 #include <Arduino.h>
 
 #include "CmdsQueue.hpp"
-#include "SerialRouter.hpp"
+#include "Global.hpp"
 #include "ProjectData.h"
+#include "SerialRouter.hpp"
 
 extern int8_t rawData[8];
 
-// class EchoOffCQ : public CmdsQueue {
-//   const char *cmds[1] = {"ATE0"};
-//   const char *getNext(int index) override {
-//     if (index >= 1)
-//       return NULL;
-//     return cmds[index];
-//   }
-// };
-
-
 class ConfigureCQ : public CmdsQueue {
 public:
-  const char *cmds[5] = {"ATE0","AT+CMGF=1", "AT+CSCS=\"GSM\"", "AT+CNMI=2,2,0,0,0", NULL};
-  ConfigureCQ(SerialRouter *sr):CmdsQueue(sr){}
-  const char *getCmd(byte ind) override {
-    return cmds[ind];
-  }
+  const char *cmds[5] = {"ATE0", "AT+CMGF=1", "AT+CSCS=\"GSM\"",
+                         "AT+CNMI=2,2,0,0,0", NULL};
+  ConfigureCQ(SerialRouter *sr) : CmdsQueue(sr) {}
+  const char *getCmd(byte ind) override { return cmds[ind]; }
 };
-/*
-
-
 
 class RingResetterCQ : public CmdsQueue {
 public:
-const char *ringCmds[2] = {"ATH","AT+CFUN=15"};
+  const char *ringCmds[2] = {"ATH", "AT+CFUN=15"};
 
-  RingResetterCQ(SerialRouter *sr):CmdsQueue(sr){}
+  RingResetterCQ(SerialRouter *sr) : CmdsQueue(sr) {}
   const char *getCmd(byte ind) override {
     static unsigned long lastRing = 0;
     static byte ringCount = 0;
@@ -54,33 +41,48 @@ const char *ringCmds[2] = {"ATH","AT+CFUN=15"};
     }
     lastRing = millis();
     ringCount++;
-    if(ringCount==4) return ringCmds[0];
-    if(ind == 1) {
-      delay(600); //for user who call
+    if (ringCount == 4)
+      return ringCmds[0];
+    if (ind == 1) {
+      delay(600); // for user who call
       return ringCmds[1];
-    }
-    else return NULL;
+    } else
+      return NULL;
   }
 };
 
+//extern void moveStepper();
 
-class SmsReactorCQ: public CmdsQueue {
+void callMoveStepper(const char * cmdForChangePosition){
+
+  int delta = atoi(cmdForChangePosition);
+  int8_t nv = rawData[GAS_TARGET_TEMP] + delta;
+  rawData[GAS_TARGET_TEMP] = constrain(nv, -1, 90);
+  Serial.print("MOVE CMD\ndelta:");
+  Serial.println(delta);
+  Serial.print("val:");
+  Serial.println(rawData[GAS_TARGET_TEMP]);
+  moveStepper();
+}
+
+class SmsReactorCQ : public CmdsQueue {
 public:
-  const char * NAIL_PHONE = "+79047612279";
-  const char * AYUP_PHONE = "+79061116054";
-  const char * SEND_SMS = "AT+CMGS=\"%s\"";
-  const char * CONTENT = "%s%c%i'C   --> # -->   %c%i'C\ntemperature: %c%i'C (%i%%)\x1A";
+  const char *NAIL_PHONE = "+79047612279";
+  const char *AYUP_PHONE = "+79061116054";
+  const char *SEND_SMS = "AT+CMGS=\"%s\"";
+  const char *CONTENT =
+      "%s%c%i'C   --> # -->   %c%i'C\ntemperature: %c%i'C (%i%%)\x1A";
   // int cmdForChangePosition = 0;
   char cmdForChangePosition[4] = {'\0'};
   bool isNailPhone = true;
-  SmsReactorCQ(SerialRouter *sr):CmdsQueue(sr){}
+  SmsReactorCQ(SerialRouter *sr) : CmdsQueue(sr) {}
 
   CmdQisFinished runQ() override {
-    if(strstr(sr->lineBuffer,NAIL_PHONE) != NULL) {
+    if (strstr(sr->lineBuffer, NAIL_PHONE) != NULL) {
       isNailPhone = true;
       return false;
     }
-    if  (strstr(sr->lineBuffer,AYUP_PHONE) != NULL) {
+    if (strstr(sr->lineBuffer, AYUP_PHONE) != NULL) {
       isNailPhone = false;
       return false;
     }
@@ -88,11 +90,14 @@ public:
   }
 
 
+
   CmdQisFinished reactForSimpleLine() override {
-    if(executedCmdIndex == 255){
-      if (sr->lineBuffer[0]=='+' || sr->lineBuffer[0]=='-'){
-        if(strlen(sr->lineBuffer) > 3) return true;
+    if (executedCmdIndex == 255) {
+      if (sr->lineBuffer[0] == '+' || sr->lineBuffer[0] == '-') {
+        if (strlen(sr->lineBuffer) > 3)
+          return true;
         strcpy(cmdForChangePosition, sr->lineBuffer);
+        callMoveStepper(cmdForChangePosition);
         return cmdSuccseed();
       }
       if (strcmp(sr->lineBuffer, "003") == 0) {
@@ -104,7 +109,7 @@ public:
 
   CmdQisFinished newLineEvent(bool isFullLine) override {
     if (executedCmdIndex == 0 && responseIs(">")) {
-        return cmdSuccseed();
+      return cmdSuccseed();
     }
     return CmdsQueue::newLineEvent(isFullLine);
   }
@@ -113,28 +118,33 @@ public:
   const char *getCmd(byte ind) override {
     if (ind == 0) {
       const char *phone;
-      if (isNailPhone) phone = NAIL_PHONE;
-      else phone = AYUP_PHONE;
+      if (isNailPhone)
+        phone = NAIL_PHONE;
+      else
+        phone = AYUP_PHONE;
       sprintf(sendBuffer, SEND_SMS, phone);
       return sendBuffer;
     }
     if (ind == 1) {
-      char buf[22];
+      char buf[26];
       if (cmdForChangePosition[0] != '\0') {
-        strcpy(buf,"command: ");
-        strcat(buf,cmdForChangePosition);
-        strcat(buf,"; Okay!\n");
-      } else buf[0]='\0';
-      sprintf(sendBuffer, CONTENT, buf,
-        rawData[GAS_TEMP_INPUT]<0?'-':'+',rawData[GAS_TEMP_INPUT],
-        rawData[GAS_TEMP_OUTPUT]<0?'-':'+',rawData[GAS_TEMP_OUTPUT],
-        rawData[ROOM_TEMP]<0?'-':'+',rawData[ROOM_TEMP],
-        rawData[ROOM_HUMIDITY]);
+        strcpy(buf, "command: ");
+        strcat(buf, cmdForChangePosition);
+        strcat(buf, "; Okay! (");
+        char valbuf[3];
+        itoa(rawData[GAS_TARGET_TEMP],valbuf,10);
+        strcat(buf, valbuf);
+        strcat(buf, ")\n");
+      } else
+        buf[0] = '\0';
+      sprintf(sendBuffer, CONTENT, buf, rawData[GAS_TEMP_INPUT] < 0 ? '-' : '+',
+              rawData[GAS_TEMP_INPUT], rawData[GAS_TEMP_OUTPUT] < 0 ? '-' : '+',
+              rawData[GAS_TEMP_OUTPUT], rawData[ROOM_TEMP] < 0 ? '-' : '+',
+              rawData[ROOM_TEMP], rawData[ROOM_HUMIDITY]);
       return sendBuffer;
     }
     return NULL;
   }
 };
-*/
 
 #endif /* Cmds_h */

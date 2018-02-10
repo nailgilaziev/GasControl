@@ -11,22 +11,22 @@
 
 #include "CmdsQueue.hpp"
 
-
 typedef bool EventIsPresented;
 
 class SerialRouter;
 
 struct EventAction {
   const char *event;
-  CmdsQueue *(*actionQ)(SerialRouter*);
+  CmdsQueue *(*actionQ)(SerialRouter *);
   void (*actionFunc)();
 };
 
 class EventsListener {
 public:
-  //isFullLine param is ignored
-  EventIsPresented newLineEvent(bool isFullLine,bool dryRun = false);
+  // isFullLine param is ignored
+  EventIsPresented newLineEvent(bool isFullLine, bool dryRun = false);
   EventsListener(SerialRouter *sr) : sr(sr) {}
+
 protected:
   SerialRouter *sr;
 };

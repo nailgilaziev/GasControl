@@ -5,11 +5,11 @@
 #include <Adafruit_PCD8544.h>
 #include <Arduino.h>
 
-#define pLIGHT 7
+#define pLIGHT 21
 
 class NokiaDisplay {
 public:
-  Adafruit_PCD8544 d = Adafruit_PCD8544(6, 7, 8, 9, 10);
+  Adafruit_PCD8544 d = Adafruit_PCD8544(31, 29, 27, 25, 23);
   NokiaDisplay(int8_t *rawDataPointer) {
     // Software SPI (slower updates, more flexible pin options):
     // pin 7 - Serial clock out (SCLK)

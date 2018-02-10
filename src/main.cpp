@@ -13,18 +13,20 @@
  * 0.32А МОТОР СИЛЬНО ГРЕЕТСЯ - НЕ ОСТАВЛЯТЬ БЕЗ ФИКСА
  */
 #include "ProjectData.h"
+#include "Global.hpp"
 #include "SerialRouter.hpp"
-//#include <AccelStepper.h>
-//#include "NokiaDisplay.h"
+#include <AccelStepper.h>
+#include "NokiaDisplay.h"
 #include <Bounce2.h>
 #include <DallasTemperature.h>
 #include <OneWire.h>
 #include <SimpleDHT.h>
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
 
 #define WARNING_NOT_STARTED_YET 2
 
-SoftwareSerial gsmSerial(A12, A14); // RX, TX
+SoftwareSerial gsmSerial(11, 9); // RX, TX
 
 SerialRouter router(&gsmSerial);
 
@@ -43,9 +45,9 @@ unsigned long lastInteractionWithUi = 0;
 #define INTERACTION_TIME 8000
 
 // const int pBackButton = A3;
-const int pButton = A0;
-const int pRotaryA = A1;
-const int pRotaryB = A2;
+const int pButton = 2;
+const int pRotaryA = 6;
+const int pRotaryB = 4;
 
 Bounce buttonDebouncer = Bounce();
 Bounce rotaryDebouncerA = Bounce();
@@ -54,28 +56,31 @@ Bounce rotaryDebouncerA = Bounce();
 // Bounce backButtonDebouncer = Bounce();
 
 // Data from sensors measured by intervals
-unsigned long lastMeasureTime = 0;
-// 3600000
-#define MEASURE_INTERVAL 60000
+unsigned long lastMeasureTime = -28000; //diff between this and MEASURE_INTERVAL is for DHT22
+unsigned long lastSendTime = 0;
+// 1800000
+#define MEASURE_INTERVAL 30000
+#define SEND_INTERVAL 300000
+#define FIRST_SEND_INTERVAL 60000
 
 const int pDHT = 5;
 SimpleDHT22 dht22;
 
 // Data wire is plugged into port 2 on the Arduino
-#define ONE_WIRE_BUS 7
+#define ONE_WIRE_BUS 3
 // Setup a oneWire instance to communicate with any OneWire devices (not just
 // Maxim/Dallas temperature ICs)
 OneWire oneWire(ONE_WIRE_BUS);
 
 // Pass our oneWire reference to Dallas Temperature.
 DallasTemperature sensors(&oneWire);
-// AccelStepper stepper(4, 4, 6, 3, 5);
+// 4,2,1,3
+AccelStepper stepper(4, 18, 14, 12, 16);
 int8_t rawData[8];
 
-// NokiaDisplay display = NokiaDisplay(rawData);
+NokiaDisplay display = NokiaDisplay(rawData);
 
-void updateDispay() { /*display.update();*/
-}
+void updateDispay() { display.update(); }
 /* UI mode levels:
  * 0 is displaying temperature and ready to rotate stepdriver
  * (pressing rotary button or sensor button switch on display light)
@@ -111,18 +116,37 @@ void checkExecStatus() {
   }
 }
 
+void savePosition(){
+  EEPROM.write(0,rawData[GAS_TARGET_TEMP]);
+}
+
+byte getStoredPosition(){
+  byte v = EEPROM.read(0);
+  if (v == 255) {
+    EEPROM.write(0,0);
+    return 0;
+  }
+  return v;
+}
+
+
+#define TEMP_TO_STEP 40
+
 void setup(void) {
   // router.eventsListener.events = NULL;
   // start serial port
   for (int k = 0; k < 8; k++) {
-    rawData[k] = 0; //-10 is error/not initialized state
+    rawData[k] = 0; //-10 is error/not initialized state now it 127
   }
+  rawData[ROOM_TEMP] = 127;
+  rawData[ROOM_HUMIDITY] = 127;
+  rawData[GAS_TARGET_TEMP] = getStoredPosition();
   pinMode(LED_BUILTIN, OUTPUT);
   Serial.begin(9600);
   Serial.println(F("Started"));
 
   gsmSerial.begin(9600);
-  // display.init();
+  display.init();
 
   pinMode(pButton, INPUT); // INPUT_PULLUP - not pulled with builtin resistor
   //                          // bacause pulled with external resistor
@@ -142,7 +166,9 @@ void setup(void) {
   sensors.begin();
   executionStatusCode = 1;
 
-  // stepper.setAcceleration(200);
+  stepper.setAcceleration(200);
+  stepper.setMaxSpeed(500);
+  stepper.setCurrentPosition(rawData[GAS_TARGET_TEMP]*TEMP_TO_STEP);
 }
 
 boolean needAutomaticallySwitchOffDisplay() {
@@ -170,19 +196,39 @@ void menuBack() {
   setUiState(DISPLAY_ON);
 }
 
-#define TEMP_STEP 2
-#define TEMP_TO_STEP 200
+
+
+bool stepperRunned = false;
+unsigned long lastTimeStepperRunned = 0;
 
 void moveStepper() {
-  // stepper.moveTo(temperature * TEMP_TO_STEP);
+  stepperRunned = true;
+  lastTimeStepperRunned = millis();
+  Serial.println(rawData[GAS_TARGET_TEMP]);
+  stepper.moveTo(rawData[GAS_TARGET_TEMP] * TEMP_TO_STEP);
+  updateDispay();
+  savePosition();
+}
+
+void disableStepper() {
+  if (millis() - lastTimeStepperRunned > 10000) {
+    stepper.disableOutputs();
+    stepperRunned = false;
+    Serial.println("steppers disabled");
+  }
 }
 
 void changeValue(int t) {
+  // Serial.println("modes:");
+  // Serial.println(rawData[DISPLAY_MODE]);
+  // Serial.println(rawData[SELECTED_MENU]);
+
   if (rawData[DISPLAY_MODE] == DISPLAY_MENU) {
     rawData[SELECTED_MENU] = constrain(rawData[SELECTED_MENU] + t, 0, 2);
   } else if (rawData[SELECTED_MENU] == SELECTED_MENU_AUTOMATIC) {
     rawData[CLIM_TARGET_TEMP] =
         constrain(rawData[CLIM_TARGET_TEMP] + t, -9, 40);
+    Serial.println(rawData[CLIM_TARGET_TEMP]);
   } else {
     rawData[GAS_TARGET_TEMP] = constrain(rawData[GAS_TARGET_TEMP] + t, -1, 90);
   }
@@ -191,26 +237,31 @@ void changeValue(int t) {
 }
 
 void rotaryUp() {
-  // Serial.println("+");
+  Serial.println("+");
   lastInteractionWithUi = millis();
   changeValue(+1);
 }
 
 void rotaryDown() {
-  // Serial.println("-");
+  Serial.println("-");
   lastInteractionWithUi = millis();
   changeValue(-1);
 }
 
 bool measuredAfterStart = false;
-boolean timeToMeasure() {
+
+boolean timeToSend() {
   if (!measuredAfterStart) {
-    if (millis() > 5000) {
+    if (millis() > FIRST_SEND_INTERVAL) {
       measuredAfterStart = true;
       return true;
     }
     return false;
   }
+  return millis() - lastSendTime > SEND_INTERVAL;
+}
+
+boolean timeToMeasure() {
   return millis() - lastMeasureTime > MEASURE_INTERVAL;
 }
 
@@ -261,7 +312,8 @@ public:
     if (executedCmdIndex == 10) {
       if (responseIs("+TCPRECV:0", false))
         return cmdSuccseed();
-      if (responseIs(":Error", false) ||responseIs(":Buffer", false) || responseIs(":Data", false))
+      if (responseIs(":Error", false) || responseIs(":Buffer", false) ||
+          responseIs(":Data", false))
         return cmdFailed();
       return reactForSimpleLine();
     }
@@ -310,13 +362,15 @@ public:
       // if further in line problem exist, we NOT skip process
       skipSetupProcess = false;
       ind = 7;
-      executedCmdIndex = 6; //after this call func var will be incremented
+      executedCmdIndex = 6; // after this call func var will be incremented
     }
     if (ind >= 12) {
       return NULL;
     }
-    if (ind == 6) delay(6000); // delay for obtain IP 
-    if (ind == 11) delay(10); // and RECV Data
+    if (ind == 6)
+      delay(6000); // delay for obtain IP
+    if (ind == 11)
+      delay(10); // and RECV Data
     if (ind != 9 && ind != 10)
       return cmds[ind];
 
@@ -363,21 +417,21 @@ public:
   }
 };
 
-void measureTemps() {
-  lastMeasureTime = millis();
+#define MAX_DHT_ERROR_BEFORE_REPORT 20
+byte dhtErrorOcurredCount = 0;
 
-  // erial.println("Requesting temperatures...");
+void measureTemps() {
+  Serial.println("Requesting temperatures...");
   sensors.requestTemperatures(); // Send the command to get temperatures
-  int tin = (int)sensors.getTempCByIndex(1);
+  int tin = (int)(sensors.getTempCByIndex(0) - 0.5); // компенсация погрешности
   rawData[GAS_TEMP_INPUT] = tin;
   Serial.print(tin);
   Serial.print(" *C->[]->");
-  int tout = sensors.getTempCByIndex(0);
+  int tout = sensors.getTempCByIndex(1);
   rawData[GAS_TEMP_OUTPUT] = tout;
   Serial.print(tout);
   Serial.println(" *C");
 
-  delay(100);
 
   float temperature = 0;
   float humidity = 0;
@@ -386,55 +440,56 @@ void measureTemps() {
       SimpleDHTErrSuccess) {
     Serial.print(F("Read DHT22 failed, err="));
     Serial.println(err);
-    return;
+    dhtErrorOcurredCount++;
+    if (dhtErrorOcurredCount > MAX_DHT_ERROR_BEFORE_REPORT) {
+      dhtErrorOcurredCount = 0;
+      rawData[ROOM_HUMIDITY] = 127;
+      rawData[ROOM_TEMP] = 127;
+    }
+    // else just not update values
+
+  } else {
+    rawData[ROOM_HUMIDITY] = humidity;
+    rawData[ROOM_TEMP] = temperature;
   }
-  rawData[ROOM_HUMIDITY] = humidity;
-  rawData[ROOM_TEMP] = temperature;
 
   Serial.print((float)temperature);
   Serial.print(" *C, ");
   Serial.print((float)humidity);
   Serial.println(" RH%");
 
-  delay(100);
-
-  if (router.routerIsBusy())
-    return;
-  router.executeQ(new DataReportCQ(&router));
+  lastMeasureTime = millis();
 }
 
 void loop(void) {
   checkExecStatus();
   if (router.available()) {
     executionStatusCode = router.readInput();
-
-    // Serial.print('%');
   }
-  if (Serial.available())
-    while (Serial.available()) {
-      gsmSerial.write(Serial.read());
-    }
-
-  // stepper.run();
+  // if (Serial.available())
+  //   while (Serial.available()) {
+  //     gsmSerial.write(Serial.read());
+  //   }
+  stepper.run();
   if (needAutomaticallySwitchOffDisplay()) {
     switchOffDisplay();
     return;
   }
   buttonDebouncer.update();
   if (buttonDebouncer.rose()) {
-    // Serial.println("Rotary button pressed");
+    Serial.println("Rotary button pressed");
     if (getUiState() == DISPLAY_OFF) {
       switchOnDisplay();
       return;
     }
-    if (getUiState() == DISPLAY_ON) {
-      showMenu();
-      return;
-    }
-    if (getUiState() == DISPLAY_MENU) {
-      menuPressed();
-      return;
-    }
+    // if (getUiState() == DISPLAY_ON) {
+    //   showMenu();
+    //   return;
+    // }
+    // if (getUiState() == DISPLAY_MENU) {
+    //   menuPressed();
+    //   return;
+    // }
   }
   // backButtonDebouncer.update();
   // if (backButtonDebouncer.rose()) {
@@ -462,5 +517,13 @@ void loop(void) {
   if (timeToMeasure()) {
     measureTemps();
     updateDispay();
+  }
+  if (stepperRunned)
+    disableStepper();
+  if (timeToSend()){
+    if (router.routerIsBusy())
+      return;
+    lastSendTime = millis();
+    router.executeQ(new DataReportCQ(&router));
   }
 }
