@@ -25,10 +25,9 @@ typedef int8_t RouterStatus;
 
 // clear state, line_buffer is empty and we listening for input
 #define ROUTER_STATUS_LISTENING_FOR_INPUT 0
-// we a in a stete of partially read input from Serial and wait a new portion of
-// data
+// we are in a state of partially read input from Serial
+// and wait a new portion of data
 #define ROUTER_STATUS_WAITING_NEXT_CHUNK_OF_INPUT 1
-// clear state, line_buffer is empty and we listening for input
 
 #define ROUTER_STATUS_ERROR 2
 

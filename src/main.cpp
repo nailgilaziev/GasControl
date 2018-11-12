@@ -8,9 +8,6 @@
  *
  * Когда идет запрос температуры - перестают работать органы управления(как
  * сделать асинхронное поведение)
- *
- * После позиционирования мотора снимать нагрузку с катушки -> потребляет ток в
- * 0.32А МОТОР СИЛЬНО ГРЕЕТСЯ - НЕ ОСТАВЛЯТЬ БЕЗ ФИКСА
  */
 #include "ProjectData.h"
 #include "Global.hpp"
@@ -59,9 +56,9 @@ Bounce rotaryDebouncerA = Bounce();
 unsigned long lastMeasureTime = -28000; //diff between this and MEASURE_INTERVAL is for DHT22
 unsigned long lastSendTime = 0;
 // 1800000
-#define MEASURE_INTERVAL 30000
-#define SEND_INTERVAL 300000
-#define FIRST_SEND_INTERVAL 60000
+#define MEASURE_INTERVAL 60000
+#define SEND_INTERVAL 600000
+#define FIRST_SEND_INTERVAL 65000
 
 const int pDHT = 5;
 SimpleDHT22 dht22;
@@ -130,7 +127,7 @@ byte getStoredPosition(){
 }
 
 
-#define TEMP_TO_STEP 40
+#define TEMP_TO_STEP 90
 
 void setup(void) {
   // router.eventsListener.events = NULL;
@@ -212,6 +209,7 @@ void moveStepper() {
 
 void disableStepper() {
   if (millis() - lastTimeStepperRunned > 10000) {
+    if(stepper.isRunning()) return;
     stepper.disableOutputs();
     stepperRunned = false;
     Serial.println("steppers disabled");

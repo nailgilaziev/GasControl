@@ -25,9 +25,9 @@ CmdsQueue *reactOnSms(SerialRouter *sr) { return new SmsReactorCQ(sr); }
 //смс m60 - установка ручного режима на котле в 60 градусов
 const int eventsCount = 3;
 EventAction events[eventsCount] = {
-  {"+PBREADY", &configereSms, NULL},
-  {"RING", &ringInterrupter, NULL},
-  {"+CMT: \"+79", &reactOnSms, NULL}
+  {"+PBREADY", &configereSms, NULL}
+  ,{"RING", &ringInterrupter, NULL}
+  ,{"+CMT: \"+79", &reactOnSms, NULL}
                                  };
 
 EventIsPresented EventsListener::newLineEvent(bool isFullLine, bool dryRun) {
